@@ -4,6 +4,17 @@ A battle-hardened NestJS backend foundation built for large teams and long-term 
 
 ---
 
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Deep technical reference — layers, request lifecycle, security model, design decisions |
+| [WORKING.md](WORKING.md) | Day-to-day coding guide — where files go, how to add a feature, naming rules, forbidden patterns |
+
+Start with **[WORKING.md](WORKING.md)** if you're new to the project. Read **[ARCHITECTURE.md](ARCHITECTURE.md)** when you need to understand *why* things are built the way they are.
+
+---
+
 ## Architecture Overview
 
 ```
