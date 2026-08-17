@@ -29,10 +29,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         'Unhandled server error',
       );
     } else if (status >= 400) {
-      this.logger.warn(
-        { correlationId, path: request.url, status, message },
-        'Client error',
-      );
+      this.logger.warn({ correlationId, path: request.url, status, message }, 'Client error');
     }
 
     const errorResponse: ApiErrorResponse = {
@@ -68,12 +65,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return { status: HttpStatus.INTERNAL_SERVER_ERROR, message: 'Internal server error' };
   }
 
-  private resolvePrismaError(
-    err: Prisma.PrismaClientKnownRequestError,
-  ): { status: number; message: string } {
+  private resolvePrismaError(err: Prisma.PrismaClientKnownRequestError): {
+    status: number;
+    message: string;
+  } {
     switch (err.code) {
       case 'P2002':
-        return { status: HttpStatus.CONFLICT, message: 'A record with these details already exists' };
+        return {
+          status: HttpStatus.CONFLICT,
+          message: 'A record with these details already exists',
+        };
       case 'P2025':
         return { status: HttpStatus.NOT_FOUND, message: 'Record not found' };
       case 'P2003':

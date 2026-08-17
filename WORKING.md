@@ -68,8 +68,7 @@ Use this table whenever you create a new file.
 | A TypeScript type or interface used by multiple features | `src/shared/types/` |
 | A reusable helper function (pure logic, no database) | `src/shared/utils/` |
 | A shared constant (a fixed string or number used everywhere) | `src/shared/constants/index.ts` |
-| A unit test | Same folder as the file you're testing, named `<name>.spec.ts` |
-| An end-to-end test (tests the full API) | `test/` folder, named `<feature>.e2e-spec.ts` |
+| A Pactum API test | `test/` folder — add a `describe` in `app.spec.ts` or a new `<feature>.spec.ts` |
 
 ---
 
@@ -386,53 +385,49 @@ export class AppModule {}
 
 ### Step 10 — Write the tests
 
-**File:** `src/modules/products/products.service.spec.ts`
+Add a `describe` block to `test/app.spec.ts` (the app is already bootstrapped; Pactum's base URL includes `/api/v1`).
 
 ```typescript
-import { NotFoundException } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { ProductsService } from './products.service';
-import { ProductsRepository } from './repositories/products.repository';
+describe('Products', () => {
+  const createDto = {
+    name: 'Widget',
+    price: 9.99,
+  };
 
-const mockProduct = { id: '1', name: 'Widget', price: 9.99 } as any;
-
-describe('ProductsService', () => {
-  let service: ProductsService;
-  let repository: jest.Mocked<ProductsRepository>;
-
-  beforeEach(async () => {
-    const module = await Test.createTestingModule({
-      providers: [
-        ProductsService,
-        {
-          provide: ProductsRepository,
-          useValue: {
-            create: jest.fn(),
-            findById: jest.fn(),
-            findAll: jest.fn(),
-            update: jest.fn(),
-            delete: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
-
-    service = module.get(ProductsService);
-    repository = module.get(ProductsRepository);
-  });
-
-  afterEach(() => jest.restoreAllMocks());
-
-  describe('findOne', () => {
-    it('returns the product when it exists', async () => {
-      repository.findById.mockResolvedValue(mockProduct);
-      const result = await service.findOne('1');
-      expect(result).toEqual(mockProduct);
+  describe('POST /products', () => {
+    it('should throw if form is empty', async () => {
+      await pactum.spec().post('/products').withBearerToken('$S{userAt}').withBody({}).expectStatus(400);
     });
 
-    it('throws NotFoundException when the product does not exist', async () => {
-      repository.findById.mockResolvedValue(null);
-      await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
+    it('should create a product', async () => {
+      await pactum
+        .spec()
+        .post('/products')
+        .withBearerToken('$S{userAt}')
+        .withBody(createDto)
+        .expectStatus(201)
+        .stores('productId', 'data.id');
+    });
+  });
+
+  describe('GET /products/:id', () => {
+    it('should throw if product does not exist', async () => {
+      await pactum
+        .spec()
+        .get('/products/{id}')
+        .withPathParams('id', 'missing')
+        .withBearerToken('$S{userAt}')
+        .expectStatus(404);
+    });
+
+    it('should return the product', async () => {
+      await pactum
+        .spec()
+        .get('/products/{id}')
+        .withPathParams('id', '$S{productId}')
+        .withBearerToken('$S{userAt}')
+        .expectStatus(200)
+        .expectJsonLike({ data: { name: createDto.name } });
     });
   });
 });
@@ -735,7 +730,7 @@ async create(@Body() dto: CreateProductDto): Promise<ProductResponseDto> {
 }
 ```
 
-**Why:** Logic in controllers can't be unit tested without spinning up an HTTP server.
+**Why:** Logic in controllers belongs in the service so it can be reused and stays independent of HTTP.
 
 ---
 
@@ -896,50 +891,30 @@ export class ProductsService {
 
 ---
 
-### A unit test (the structure to follow every time)
+### A Pactum API test (the structure to follow every time)
 
 ```typescript
-describe('ProductsService', () => {
-  let service: ProductsService;
-  let repository: jest.Mocked<ProductsRepository>;
+describe('Products', () => {
+  const createDto = { name: 'Widget', price: 9.99 };
 
-  // Set up fresh instances before each test
-  beforeEach(async () => {
-    const module = await Test.createTestingModule({
-      providers: [
-        ProductsService,
-        {
-          provide: ProductsRepository,
-          useValue: {
-            findById: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
-            delete: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
-
-    service = module.get(ProductsService);
-    repository = module.get(ProductsRepository);
-  });
-
-  // Reset mocks after each test so they don't bleed into each other
-  afterEach(() => jest.restoreAllMocks());
-
-  describe('findOne', () => {
-    it('returns the product when it exists', async () => {
-      repository.findById.mockResolvedValue(mockProduct);
-
-      const result = await service.findOne('product-id');
-
-      expect(result).toEqual(mockProduct);
+  describe('GET /products/:id', () => {
+    it('should throw if product does not exist', async () => {
+      await pactum
+        .spec()
+        .get('/products/{id}')
+        .withPathParams('id', 'nonexistent')
+        .withBearerToken('$S{userAt}')
+        .expectStatus(404);
     });
 
-    it('throws NotFoundException when the product does not exist', async () => {
-      repository.findById.mockResolvedValue(null);
-
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+    it('should return the product', async () => {
+      await pactum
+        .spec()
+        .get('/products/{id}')
+        .withPathParams('id', '$S{productId}')
+        .withBearerToken('$S{userAt}')
+        .expectStatus(200)
+        .expectJsonLike({ data: { name: createDto.name } });
     });
   });
 });

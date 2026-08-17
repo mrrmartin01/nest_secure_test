@@ -19,7 +19,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UsersService } from './users.service';
 import type { PaginatedResult } from '@shared/types/pagination.types';
-import type { UserEntity } from './entities/user.entity';
 
 @Controller('users')
 export class UsersController {
@@ -72,10 +71,7 @@ export class UsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() requestUser: RequestUser,
-  ): Promise<void> {
+  async remove(@Param('id') id: string, @CurrentUser() requestUser: RequestUser): Promise<void> {
     if (requestUser.role !== Role.ADMIN && requestUser.id !== id) {
       const { ForbiddenException } = await import('@nestjs/common');
       throw new ForbiddenException('You can only delete your own account');
