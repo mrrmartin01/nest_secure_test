@@ -1,16 +1,36 @@
-name: CI
+name: CI & Security Pipeline
 
 on:
-  pull_request:
-    branches: [main, development]
   push:
-    branches: [main, development]
+    branches:
+      - main
+      - development
 
+  pull_request:
+    branches:
+      - main
+      - development
+
+  schedule:
+    # Run every Monday at 01:30 UTC
+    - cron: "30 1 * * 1"
+
+# Default permissions for all jobs.
+# Individual jobs can request additional permissions when required.
+permissions:
+  contents: read
+
+# Prevent duplicate runs for the same branch/PR.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+
+  # ============================================================
+  # CI
+  # Lint · Typecheck · Test · Build
+  # ============================================================
   ci:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
@@ -18,25 +38,31 @@ jobs:
     services:
       postgres:
         image: postgres:16-alpine
+
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: nest_secure_test
+
         ports:
           - 5432:5432
+
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
+    # These values are ONLY for the CI test database.
+    # They must never be used in production.
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://test:test@localhost:5432/nest_secure_test
-      JWT_SECRET: ci-test-secret-that-is-at-least-32-characters-long
-      JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-characters-long
+      JWT_SECRET: ci-only-test-secret-not-for-production
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-not-for-production
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -53,13 +79,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
+      # DATABASE_URL is explicitly provided here because
+      # bun install triggers the package's postinstall script,
+      # which runs `prisma generate`.
       - name: Install dependencies
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/nest_secure_test
         run: bun install --frozen-lockfile
 
-      - name: Generate Prisma client
-        run: bun run prisma:generate
+      # Prisma generate is already executed by the postinstall
+      # script during `bun install`, so there is no need to run
+      # it a second time here.
 
       - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/nest_secure_test
         run: bunx prisma migrate deploy
 
       - name: Lint
@@ -79,3 +113,98 @@ jobs:
         if: always()
         with:
           directory: ./coverage
+
+
+  # ============================================================
+  # Dependency Vulnerability Audit
+  # ============================================================
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-security-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-security-
+
+      - name: Install dependencies
+        env:
+          # Prisma's postinstall runs `prisma generate`,
+          # which requires DATABASE_URL.
+          DATABASE_URL: postgresql://test:test@localhost:5432/nest_secure_test
+        run: bun install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: bun audit
+
+
+  # ============================================================
+  # CodeQL Static Analysis
+  # ============================================================
+  codeql:
+    name: CodeQL Static Analysis
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        language:
+          - javascript-typescript
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      # JavaScript/TypeScript does not require Autobuild.
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+
+  # ============================================================
+  # TruffleHog Secret Scanning
+  # ============================================================
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full Git history allows TruffleHog to inspect commits.
+          fetch-depth: 0
+
+      - name: TruffleHog Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --debug --only-verified
