@@ -68,7 +68,10 @@ nest_secure/
 │   └── pre-push               # Runs typecheck + tests (blocks broken pushes)
 │
 ├── prisma/
-│   └── schema.prisma           # Single source of truth for the database schema
+│   ├── schema.prisma           # Single source of truth for the database schema
+│   └── migrations/             # SQL migrations applied by Prisma CLI
+│
+├── prisma.config.ts            # Prisma 7 CLI datasource (DATABASE_URL)
 │
 ├── src/
 │   │
@@ -104,7 +107,6 @@ nest_secure/
 │   │   │   │   └── local.strategy.ts         # Validates email+password
 │   │   │   ├── auth.controller.ts
 │   │   │   ├── auth.service.ts
-│   │   │   ├── auth.service.spec.ts
 │   │   │   └── auth.module.ts
 │   │   │
 │   │   └── users/
@@ -118,7 +120,6 @@ nest_secure/
 │   │       │   └── users.repository.ts       # All DB queries live here
 │   │       ├── users.controller.ts
 │   │       ├── users.service.ts
-│   │       ├── users.service.spec.ts
 │   │       └── users.module.ts
 │   │
 │   ├── shared/                 ← SHARED KERNEL (zero business logic)
@@ -140,13 +141,13 @@ nest_secure/
 │   └── main.ts                 # Bootstrap: Helmet, CORS, ValidationPipe, Pino
 │
 ├── test/
-│   ├── app.e2e-spec.ts         # Full HTTP stack tests against a real DB
-│   └── jest-e2e.json           # Jest config for E2E suite
+│   └── app.spec.ts             # Pactum API tests against a real DB
 │
 ├── .env.example                # Every env var documented with types and defaults
 ├── .gitignore
 ├── .lintstagedrc.js
 ├── .prettierrc
+├── bunfig.toml                 # Bun test timeout + coverage threshold
 ├── commitlint.config.js
 ├── eslint.config.mjs
 ├── nest-cli.json
@@ -196,7 +197,6 @@ users/
 │
 ├── users.service.ts        # Business logic; calls repository; throws HTTP exceptions
 ├── users.controller.ts     # HTTP routing only; calls service; returns response DTOs
-├── users.service.spec.ts   # Unit tests for the service
 └── users.module.ts         # Declares providers, exports UsersService for AuthModule
 ```
 
@@ -457,36 +457,36 @@ export class UsersService {
 
 ## 11. Testing Architecture
 
-### Unit Tests (`*.spec.ts` — co-located with source)
+### API Tests (`test/*.spec.ts` — Pactum against real DB)
 
-- One `describe` block per class
-- All dependencies mocked with `jest.fn()` — no DB, no network
-- Test happy path + every named error branch (NotFoundException, ConflictException, etc.)
-- Pure utility functions (hash.util, pagination.util) tested without mocking
+Bun is the runner (`describe`/`it`). Pactum is the HTTP client and assertion library. Tests exercise the full stack: request → guard → pipe → handler → response envelope.
 
-### E2E Tests (`test/*.e2e-spec.ts` — against real DB)
-
-- Full HTTP stack: request → middleware → guard → handler → response
+- One outer `describe` per resource, nested `describe` per HTTP method
 - Real PostgreSQL (test database)
 - Test data scoped with identifiable emails (e.g., `@e2e.test`) and cleaned up in `afterAll`
-- Cover: success cases, auth enforcement (401 without token), validation rejections, conflict detection
+- Cover: validation (400), auth (401), forbidden (403), not found (404), conflict (409), and success
+- Persist JWTs with `.stores()` and reuse them via `$S{storeName}`
+
+```typescript
+describe('POST /auth/register', () => {
+  it('should throw if form is empty', async () => {
+    await pactum.spec().post('/auth/register').withBody({}).expectStatus(400);
+  });
+
+  it('should pass signup', async () => {
+    await pactum
+      .spec()
+      .post('/auth/register')
+      .withBody(signupDto)
+      .expectStatus(201)
+      .stores('userAt', 'data.accessToken');
+  });
+});
+```
 
 ### Coverage Threshold
 
-70% across branches, functions, lines, and statements. CI fails below this. Raise the threshold as the codebase matures.
-
-### Mocking Utilities
-
-```typescript
-// Mock a module-level utility function
-jest.spyOn(hashUtil, 'comparePassword').mockResolvedValue(false);
-
-// Mock a repository method
-repository.findById.mockResolvedValue(null);
-
-// Always restore mocks after each test
-afterEach(() => jest.restoreAllMocks());
-```
+70% of functions and lines. CI fails below this (`bunfig.toml`). Raise the threshold as the codebase matures.
 
 ---
 
@@ -573,8 +573,7 @@ bun install (cached)
   → prisma migrate deploy (against test Postgres container)
   → bun run lint
   → bun run typecheck
-  → bun run test:cov         (fails below 70% coverage)
-  → bun run test:e2e
+  → bun run test:cov         (Pactum API tests; fails below 70% coverage)
   → bun run build
   → upload coverage to Codecov
 ```

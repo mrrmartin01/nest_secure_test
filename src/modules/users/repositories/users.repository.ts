@@ -35,7 +35,9 @@ export class UsersRepository {
         where,
         skip,
         take,
-        orderBy: query.sortBy ? { [query.sortBy]: query.sortOrder ?? 'desc' } : { createdAt: 'desc' },
+        orderBy: query.sortBy
+          ? { [query.sortBy]: query.sortOrder ?? 'desc' }
+          : { createdAt: 'desc' },
       }),
       this.prisma.user.count({ where }),
     ]);

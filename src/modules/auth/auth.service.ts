@@ -31,8 +31,8 @@ export class AuthService {
     return user;
   }
 
-  async login(user: UserEntity): Promise<AuthTokens> {
-    return this.issueTokens(user);
+  login(user: UserEntity): Promise<AuthTokens> {
+    return Promise.resolve(this.issueTokens(user));
   }
 
   async register(dto: RegisterDto): Promise<AuthTokens> {

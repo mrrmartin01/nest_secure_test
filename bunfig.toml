@@ -1,0 +1,4 @@
+[test]
+timeout = 30000
+coverageSkipTestFiles = true
+coverageThreshold = { line = 0.7, function = 0.7 }

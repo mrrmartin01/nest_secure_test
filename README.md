@@ -105,9 +105,9 @@ The server starts at `http://localhost:3000`. All routes are prefixed with `/api
 | `bun run lint` | ESLint check |
 | `bun run lint:fix` | ESLint auto-fix |
 | `bun run typecheck` | TypeScript type check (no emit) |
-| `bun run test` | Jest unit tests |
-| `bun run test:cov` | Unit tests with coverage report |
-| `bun run test:e2e` | End-to-end tests (requires DB) |
+| `bun run test` | Pactum API tests (requires DB) |
+| `bun run test:cov` | API tests with coverage report |
+| `bun run test:e2e` | Alias for `bun run test` |
 | `bun run prisma:migrate` | Apply pending migrations |
 | `bun run prisma:studio` | Open Prisma Studio |
 
@@ -184,24 +184,16 @@ mkdir -p src/modules/products/{dto,entities,repositories}
 
 ## Testing Strategy
 
-| Layer | Tool | Location |
-|---|---|---|
-| Unit | Jest | `*.spec.ts` co-located with source |
-| Integration / E2E | Jest + Supertest | `test/*.e2e-spec.ts` |
+API tests use **Pactum** (Bun runs `describe`/`it`). They live in `test/*.spec.ts` and hit the real HTTP stack against PostgreSQL.
 
-**Unit test patterns:**
-- Mock all dependencies with `jest.fn()` — never touch the DB in unit tests
-- Test one class per describe block
-- Cover happy path, not-found, conflict, and validation branches
-- `jest.spyOn` to mock utility functions (e.g., `hashPassword`)
+**Patterns:**
+- One `describe` per resource, nested `describe` per HTTP method
+- Await `pactum.spec()` chains — assert with `.expectStatus()` / `.expectJsonLike()`
+- Scope test data with identifiable emails (e.g., `@e2e.test`) and clean up in `afterAll`
+- Store tokens with `.stores('userAt', 'data.accessToken')` and reuse via `$S{userAt}`
+- Cover validation (400), auth (401), conflict (409), and happy path
 
-**E2E test patterns:**
-- Use a real test database (see CI postgres service)
-- Scope test data with identifiable emails (e.g., `@e2e.test`)
-- Clean up test data in `afterAll`
-- Test the full HTTP stack including middleware
-
-Coverage threshold: **70%** for branches, functions, lines, statements.
+Coverage threshold: **70%** of functions and lines (enforced in `bunfig.toml`).
 
 ---
 
@@ -262,7 +254,7 @@ Two GitHub Actions workflows:
 1. Install deps (Bun, cached)
 2. Generate Prisma client
 3. Run migrations against test Postgres service
-4. Lint → Typecheck → Unit tests + coverage → E2E tests → Build
+4. Lint → Typecheck → API tests + coverage → Build
 
 **`.github/workflows/security.yml`** — runs on push + weekly schedule:
 1. `bun audit` for vulnerable dependencies
@@ -275,7 +267,7 @@ Two GitHub Actions workflows:
 
 1. Branch from `development`, not `main`
 2. Keep PRs focused — one concern per PR
-3. All new code must have unit tests with the happy path + at least one error path
+3. All new endpoints must have Pactum tests with the happy path + at least one error path
 4. No `console.log` — use the injected `Logger` from `@nestjs/common`
 5. No raw SQL — use Prisma queries through the repository layer
 6. Never put business logic in controllers or repositories

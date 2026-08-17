@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'dist/**', 'coverage/**', 'node_modules/**'],
+    ignores: ['eslint.config.mjs', 'dist/**', 'coverage/**', 'node_modules/**', 'prisma.config.ts', 'test/**/*.d.ts'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -15,7 +15,6 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.jest,
       },
       sourceType: 'commonjs',
       parserOptions: {
@@ -55,6 +54,14 @@ export default tseslint.config(
   {
     // Relax rules for test files
     files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+      },
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
