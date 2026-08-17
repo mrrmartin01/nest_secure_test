@@ -22,7 +22,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.1",
@@ -82,5 +83,9 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.67.0"
+  },
+  "overrides": {
+    "fast-uri": "3.1.5",
+    "js-yaml": "4.3.1"
   }
 }
