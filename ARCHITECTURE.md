@@ -61,6 +61,13 @@ nest_secure/
 │   └── workflows/
 │       └── ci.yml              # CI + security pipeline (lint, tests, audit, Semgrep, Gitleaks)
 │
+├── docker/
+│   └── entrypoint.sh           # Container start: migrate deploy → run app
+│
+├── Dockerfile                  # Multi-stage Bun image (deps → build → runner)
+├── docker-compose.yml          # Postgres (dev/test) + optional API (`--profile app`)
+├── .dockerignore
+│
 ├── .husky/
 │   ├── pre-commit              # Runs lint-staged (ESLint + Prettier on staged files)
 │   ├── commit-msg              # Runs commitlint (enforces conventional commits)

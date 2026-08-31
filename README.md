@@ -69,7 +69,7 @@ src/
 
 ### Prerequisites
 - [Bun](https://bun.sh) >= 1.0
-- PostgreSQL 15+
+- [Docker](https://docs.docker.com/get-docker/) (Compose v2) — for Postgres and optional full-stack runs
 
 ### Setup
 
@@ -79,12 +79,14 @@ bun install
 
 # 2. Copy environment template
 cp .env.example .env
-# Edit .env — fill in DATABASE_URL and JWT secrets
+# Edit .env — fill in JWT secrets (DATABASE_URL already points at Compose Postgres)
 
-# 3. Generate Prisma client
+# 3. Start Postgres
+bun run docker:up
+# → localhost:5434 / dev_db (credentials from DEV_DB_* in .env)
+
+# 4. Generate Prisma client & run migrations
 bun run prisma:generate
-
-# 4. Run database migrations
 bun run prisma:migrate
 
 # 5. Start development server
@@ -92,6 +94,32 @@ bun run dev
 ```
 
 The server starts at `http://localhost:3000`. All routes are prefixed with `/api/v1/`.
+
+### Docker
+
+| Command | What it does |
+|---|---|
+| `bun run docker:up` | Start dev Postgres (`dev-db` on host port **5434**) |
+| `bun run docker:down` | Stop Compose services |
+| `bun run docker:test-db` | Start ephemeral test Postgres (`test-db` on **5435**) |
+| `bun run docker:app` | Build & run the API container + Postgres (`--profile app`) |
+
+**Full stack (API in Docker):**
+
+```bash
+cp .env.example .env   # set JWT_SECRET / JWT_REFRESH_SECRET (≥32 chars)
+bun run docker:app
+# API → http://localhost:3000  (runs migrations on start)
+```
+
+**Image only:**
+
+```bash
+docker build -t nest-secure .
+docker run --rm -p 3000:3000 --env-file .env \
+  -e DATABASE_URL=postgresql://devuser:changeme@host.docker.internal:5434/dev_db?schema=public \
+  nest-secure
+```
 
 ---
 
@@ -110,6 +138,10 @@ The server starts at `http://localhost:3000`. All routes are prefixed with `/api
 | `bun run test:e2e` | Alias for `bun run test` |
 | `bun run prisma:migrate` | Apply pending migrations |
 | `bun run prisma:studio` | Open Prisma Studio |
+| `bun run docker:up` | Start Compose Postgres (dev) |
+| `bun run docker:down` | Stop Compose services |
+| `bun run docker:test-db` | Start Compose Postgres (test profile) |
+| `bun run docker:app` | Build & run API + Postgres |
 
 ---
 

@@ -1,40 +1,66 @@
 services:
+  # Local development Postgres — started by default (`docker compose up -d`)
+  # Host: localhost:5434  |  DB: dev_db
   dev-db:
-    image: postgres:13
+    image: postgres:16-alpine
     ports:
       - "5434:5432"
     environment:
       POSTGRES_USER: ${DEV_DB_USER:-devuser}
-      POSTGRES_PASSWORD: ${DEV_DB_PASSWORD:-123}
+      POSTGRES_PASSWORD: ${DEV_DB_PASSWORD:-changeme}
       POSTGRES_DB: dev_db
     volumes:
       - dev-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DEV_DB_USER:-devuser}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DEV_DB_USER:-devuser} -d dev_db"]
       interval: 2s
       timeout: 2s
       retries: 10
     networks:
       - app-network
 
+  # Ephemeral test Postgres — `docker compose --profile test up -d`
+  # Host: localhost:5435  |  DB: test_db
+  # Also started automatically by `bun run pretest` / `scripts/setup-test-db.ts`
   test-db:
-    image: postgres:13
+    image: postgres:16-alpine
     profiles: ["test"]
     ports:
       - "5435:5432"
     environment:
       POSTGRES_USER: ${TEST_DB_USER:-testuser}
-      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-123}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-changeme}
       POSTGRES_DB: test_db
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TEST_DB_USER:-testuser}"]
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_DB_USER:-testuser} -d test_db"]
       interval: 2s
       timeout: 2s
       retries: 10
     networks:
       - app-network
+
+  # Full-stack API — `docker compose --profile app up -d --build`
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # Reach Postgres on the Compose network (not localhost)
+      DATABASE_URL: postgresql://${DEV_DB_USER:-devuser}:${DEV_DB_PASSWORD:-changeme}@dev-db:5432/dev_db?schema=public
+    depends_on:
+      dev-db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
 
 volumes:
   dev-db-data:

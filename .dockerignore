@@ -1,0 +1,37 @@
+# Dependencies & build
+node_modules
+dist
+build
+coverage
+*.tsbuildinfo
+
+# Git / IDE / OS
+.git
+.github
+.husky
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Env & secrets (inject at runtime)
+.env
+.env.*
+!.env.example
+
+# Tests & local tooling
+test
+scripts
+*.md
+!README.md
+.editorconfig
+.eslintrc*
+eslint.config.*
+.prettierrc*
+.lintstagedrc*
+commitlint.config.*
+bunfig.toml
+
+# Docker (avoid recursive context noise)
+docker-compose*.yml
+Dockerfile*
