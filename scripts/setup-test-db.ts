@@ -6,16 +6,18 @@ import { spawnSync } from 'node:child_process';
 config({ path: '.env.test', override: true, quiet: true });
 
 function run(cmd: string, args: string[]): void {
+  // shell:false avoids shell injection / env propagation (Semgrep: spawn-shell-true).
+  // Use `bun x` instead of `bunx` so Windows does not need a .cmd shell wrapper.
   const result = spawnSync(cmd, args, {
     stdio: 'inherit',
     env: process.env,
-    shell: process.platform === 'win32',
+    shell: false,
   });
 
-  if (result.status !== 0) {
+  if (result.error || result.status !== 0) {
     process.exit(result.status ?? 1);
   }
 }
 
 run('docker', ['compose', '--profile', 'test', 'up', '-d', '--wait', 'test-db']);
-run('bunx', ['prisma', 'migrate', 'deploy']);
+run('bun', ['x', 'prisma', 'migrate', 'deploy']);

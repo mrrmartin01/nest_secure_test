@@ -1,0 +1,17 @@
+# Gitleaks configuration — extends the default rule set.
+# Docs: https://github.com/gitleaks/gitleaks#configuration
+
+title = "nest_secure"
+
+[extend]
+useDefault = true
+
+# Global allowlists (gitleaks >= 8.25 uses [[allowlists]]; older builds still accept [allowlist])
+[[allowlists]]
+description = "CI workflow placeholders and known non-production test JWT values"
+paths = [
+  '''(^|/)\.github/workflows/ci\.yml$''',
+]
+regexes = [
+  '''(?i)ci-only-(test|refresh)-secret-not-for-production''',
+]
