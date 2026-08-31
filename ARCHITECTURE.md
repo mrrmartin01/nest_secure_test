@@ -59,8 +59,7 @@ nest_secure/
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml              # Lint → Typecheck → Tests → Build on every PR
-│       └── security.yml        # Dependency audit + CodeQL + secret scanning
+│       └── ci.yml              # CI + security pipeline (lint, tests, audit, Semgrep, Gitleaks)
 │
 ├── .husky/
 │   ├── pre-commit              # Runs lint-staged (ESLint + Prettier on staged files)
@@ -575,17 +574,17 @@ bun install (cached)
   → bun run typecheck
   → bun run test:cov         (Pactum API tests; fails below 70% coverage)
   → bun run build
-  → upload coverage to Codecov
+  → upload coverage as workflow artifact
 ```
 
 Any step failure blocks the PR merge.
 
-### security.yml — runs on push + weekly cron
+### Security jobs — same workflow, runs on push + weekly cron
 
 ```
 bun audit                   (known CVE check)
-CodeQL analysis             (static security patterns)
-TruffleHog secret scan      (detects committed secrets)
+Semgrep analysis            (static security patterns)
+Gitleaks secret scan        (detects committed secrets)
 ```
 
 ### Branch Strategy

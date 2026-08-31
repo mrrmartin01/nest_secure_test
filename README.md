@@ -248,18 +248,19 @@ Types: `feat` `fix` `docs` `style` `refactor` `perf` `test` `build` `ci` `chore`
 
 ## CI/CD
 
-Two GitHub Actions workflows:
+**`.github/workflows/ci.yml`** — runs on every PR/push to `main` or `development`, plus a weekly schedule:
 
-**`.github/workflows/ci.yml`** — runs on every PR to `main` or `development`:
+**CI job** — lint, typecheck, tests, build:
 1. Install deps (Bun, cached)
 2. Generate Prisma client
 3. Run migrations against test Postgres service
 4. Lint → Typecheck → API tests + coverage → Build
+5. Upload coverage report as a workflow artifact
 
-**`.github/workflows/security.yml`** — runs on push + weekly schedule:
+**Security jobs** (same workflow):
 1. `bun audit` for vulnerable dependencies
-2. CodeQL static analysis for JS/TS security patterns
-3. TruffleHog secret scanning on commit diff
+2. Semgrep static analysis for JS/TS security patterns
+3. Gitleaks secret scanning on full git history
 
 ---
 

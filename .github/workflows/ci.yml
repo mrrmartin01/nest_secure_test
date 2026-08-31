@@ -108,11 +108,14 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
+      # Store coverage locally — no third-party service or token required.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          directory: ./coverage
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
 
 
   # ============================================================
@@ -152,44 +155,26 @@ jobs:
 
 
   # ============================================================
-  # CodeQL Static Analysis
+  # Semgrep Static Analysis (OSS — no GitHub Advanced Security)
   # ============================================================
-  codeql:
-    name: CodeQL Static Analysis
+  semgrep:
+    name: Semgrep Static Analysis
     runs-on: ubuntu-latest
 
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    strategy:
-      fail-fast: false
-
-      matrix:
-        language:
-          - javascript-typescript
+    container:
+      image: semgrep/semgrep
 
     steps:
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          queries: security-extended
-
-      # JavaScript/TypeScript does not require Autobuild.
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+      - name: Run Semgrep
+        run: semgrep scan --config auto --error
 
 
   # ============================================================
-  # TruffleHog Secret Scanning
+  # Gitleaks Secret Scanning (OSS)
   # ============================================================
   secret-scan:
     name: Secret Scanning
@@ -200,11 +185,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Full Git history allows TruffleHog to inspect commits.
           fetch-depth: 0
 
-      - name: TruffleHog Scan
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          extra_args: --debug --only-verified
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
